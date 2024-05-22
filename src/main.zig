@@ -1,5 +1,7 @@
 const std = @import("std");
+const utils = @import("./utils/uuid.zig");
 
 pub fn main() !void {
-    std.debug.print("HI\n", .{});
+    const id = utils.generate_uuid();
+    std.debug.print("HI {s}\n", .{id.*});
 }
