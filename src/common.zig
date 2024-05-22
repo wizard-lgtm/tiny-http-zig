@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// Define a struct to represent the HTTP version
-const HTTPVersion = struct {
+pub const HTTPVersion = struct {
     major: u8, // Major version number (e.g., 1 in HTTP/1.1)
     minor: u8, // Minor version number (e.g., 1 in HTTP/1.1)
 
