@@ -6,12 +6,10 @@ pub fn build(b: *std.Build) void {
 
     const lib = b.addStaticLibrary(.{
         .name = "tiny-http-zig",
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
         .name = "tiny-http-zig",
@@ -20,7 +18,18 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    b.installArtifact(exe);
+    // Dependencies
+
+    // dependency for uuid
+    const uuid = b.dependency("uuid", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("uuid", uuid.module("uuid"));
+    exe.root_module.linkLibrary(uuid.artifact("uuid-zig"));
+
+    b.installArtifact(lib);
 
     const run_cmd = b.addRunArtifact(exe);
 
