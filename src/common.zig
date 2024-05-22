@@ -25,7 +25,7 @@ const HTTPVersion = struct {
 ///
 /// As per [RFC 7231](https://tools.ietf.org/html/rfc7231#section-4.1) and
 /// [RFC 5789](https://tools.ietf.org/html/rfc5789)
-const Method = enum {
+pub const Method = enum {
     /// `GET`
     Get,
 
@@ -58,7 +58,7 @@ const Method = enum {
 };
 
 /// Status code of a request or response.
-const StatusCode = struct {
+pub const StatusCode = struct {
     code: u16,
 
     pub fn init(code: u16) StatusCode {
@@ -133,5 +133,40 @@ const StatusCode = struct {
             511 => "Network Authentication Required",
             else => "Unknown",
         };
+    }
+};
+
+/// Field of a header (eg. `Content-Type`, `Content-Length`, etc.)
+///
+/// Comparison between two `HeaderField`s ignores case.s
+pub const Header = struct {
+    field: []const u8,
+    value: []const u8,
+
+    pub fn debug(self: Header) void {
+        std.debug.print("Header(field: {s}, value: {s})\n", .{ self.field, self.value });
+    }
+
+    /// Compares two Header structs for equality.
+    pub fn eq(self: Header, other: Header) bool {
+        return std.mem.eql(u8, self.field, other.field) and std.mem.eql(u8, self.value, other.value);
+    }
+
+    /// Parses a header string into a Header struct.
+    ///
+    /// - `InvalidHeader`: Returned if the header string is not in the correct format.s
+    pub fn parse(header_str: []const u8) !Header {
+        var parts = std.mem.split(u8, header_str, ":");
+
+        const occurs = std.mem.count(u8, header_str, ":");
+
+        std.debug.print("{}\n", .{occurs});
+
+        if (occurs != 1) return error.InvalidHeader;
+
+        const field: []const u8 = parts.next() orelse return error.InvalidHeader;
+        const value: []const u8 = parts.next() orelse return error.InvalidHeader;
+
+        return Header{ .field = std.mem.trim(u8, field, " "), .value = std.mem.trim(u8, value, " ") };
     }
 };
