@@ -1,4 +1,6 @@
 const std = @import("std");
+const net = std.net;
+const Method = @import("./common.zig").HTTPMethod;
 
 /// Define a struct to represent the HTTP version
 pub const HTTPVersion = struct {
@@ -6,8 +8,20 @@ pub const HTTPVersion = struct {
     minor: u8, // Minor version number (e.g., 1 in HTTP/1.1)
 
     /// Constructor function
-    pub fn init(major: u8, minor: u8) HTTPVersion {
-        return HTTPVersion{ .major = major, .minor = minor };
+    pub fn init(version: []const u8) ReadError!HTTPVersion {
+        if (std.mem.eql(u8, version, "0.9")) {
+            return HTTPVersion{ .major = 0, .minor = 9 };
+        } else if (std.mem.eql(u8, version, "1.0")) {
+            return HTTPVersion{ .major = 1, .minor = 0 };
+        } else if (std.mem.eql(u8, version, "1.1")) {
+            return HTTPVersion{ .major = 1, .minor = 1 };
+        } else if (std.mem.eql(u8, version, "2.0")) {
+            return HTTPVersion{ .major = 2, .minor = 0 };
+        } else if (std.mem.eql(u8, version, "3.0")) {
+            return HTTPVersion{ .major = 3, .minor = 0 };
+        } else {
+            return ReadError.WrongRequestLine;
+        }
     }
 
     /// Function to print the HTTP version for debugging purposes
@@ -25,7 +39,7 @@ pub const HTTPVersion = struct {
 ///
 /// As per [RFC 7231](https://tools.ietf.org/html/rfc7231#section-4.1) and
 /// [RFC 5789](https://tools.ietf.org/html/rfc5789)
-pub const Method = enum {
+pub const HTTPMethod = enum {
     /// `GET`
     Get,
 
@@ -55,6 +69,19 @@ pub const Method = enum {
 
     /// Request methods not standardized by the IETF
     NonStandard,
+
+    pub fn init(method: []const u8) Method {
+        if (std.mem.eql(u8, method, "GET")) return Method.Get;
+        if (std.mem.eql(u8, method, "HEAD")) return Method.Head;
+        if (std.mem.eql(u8, method, "POST")) return Method.Post;
+        if (std.mem.eql(u8, method, "PUT")) return Method.Put;
+        if (std.mem.eql(u8, method, "DELETE")) return Method.Delete;
+        if (std.mem.eql(u8, method, "CONNECT")) return Method.Connect;
+        if (std.mem.eql(u8, method, "OPTIONS")) return Method.Options;
+        if (std.mem.eql(u8, method, "TRACE")) return Method.Trace;
+        if (std.mem.eql(u8, method, "PATCH")) return Method.Patch;
+        return Method.NonStandard;
+    }
 };
 
 /// Status code of a request or response.
@@ -169,4 +196,12 @@ pub const Header = struct {
 
         return Header{ .field = std.mem.trim(u8, field, " "), .value = std.mem.trim(u8, value, " ") };
     }
+};
+
+/// Error that can happen when reading a request.
+pub const ReadError = union(enum) {
+    WrongRequestLine,
+    WrongHeader: HTTPVersion,
+    ExpectationFailed: HTTPVersion,
+    ReadIoError: net.Stream.ReadError,
 };
