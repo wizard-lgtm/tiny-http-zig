@@ -13,6 +13,9 @@ const Header = common.Header;
 const StatusCode = common.StatusCode;
 
 pub const Response = struct {
+    // Allocator
+    allocator: Allocator,
+
     reader: net.Stream.Reader,
     status_code: StatusCode,
     headers: std.ArrayList(Header),
