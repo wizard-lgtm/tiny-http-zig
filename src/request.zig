@@ -22,13 +22,15 @@ pub const Request = struct {
     // Allocator
     allocator: Allocator,
 
+    ray_id: *const [36]u8,
+
     // where to read the body from
     // data_reader: net.Stream.Reader,
 
     // if this writer is empty, then the request has been answered
     response_writer: ?net.Stream.Writer,
 
-    remote_addr: net.Address,
+    remote_addr: net.Ip4Address,
 
     // true if HTTPS, false if HTTP
     secure: bool,
@@ -231,7 +233,13 @@ pub const Request = struct {
         }
     }
 
-    pub fn respond(self: *Request, buffer: []const u8) std.net.Stream.WriteError!void {
-        _ = try self.response_writer.?.writeAll(buffer);
+    pub fn respond(self: *Request, response: *Response) std.net.Stream.WriteError!void {
+        const do_not_send_body = self.method == Method.Head;
+
+        const buffer = try response.to_http_string(do_not_send_body);
+        defer self.allocator.free(buffer);
+
+        _ = try self.response_writer.?.writeAll();
+        self.sent = true;
     }
 };
