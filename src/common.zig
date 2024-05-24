@@ -98,7 +98,7 @@ pub const StatusCode = struct {
         return StatusCode{ .code = code };
     }
 
-    pub fn defaultReasonPhrase(self: StatusCode) []const u8 {
+    pub fn message(self: StatusCode) []const u8 {
         return switch (self.code) {
             100 => "Continue",
             101 => "Switching Protocols",
