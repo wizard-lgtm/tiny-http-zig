@@ -2,12 +2,12 @@
 ## A simple http server inspired by tiny-http in rust
 ### Features
 
-| Feature           | Status          |
-|-------------------|-----------------|
-| Parsing Request   | Implemented     |
-| Packing Responses | Not Implemented |
-| JSON              | Not Implemented |
-| Routing           | Future Planned  |
+| Feature           | Status            |
+|-------------------|-------------------|
+| Parsing Request   | Implemented ✅     |
+| Packing Responses | Implemented ✅     |
+| JSON              | Not Implemented ❌ |
+| Routing           | Future Planned 🎯  |
 
 ### Written with ziglang 0.12.0
 ### Supported zig versions
