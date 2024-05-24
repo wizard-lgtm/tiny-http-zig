@@ -4,7 +4,7 @@
 
 | Feature           | Status          |
 |-------------------|-----------------|
-| Parsing Request   | Not Impemented  |
+| Parsing Request   | Implemented     |
 | Packing Responses | Not Implemented |
 | JSON              | Not Implemented |
 | Routing           | Future Planned  |
