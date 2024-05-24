@@ -1,6 +1,5 @@
 const std = @import("std");
 const net = std.net;
-const Method = @import("./common.zig").HTTPMethod;
 
 /// Define a struct to represent the HTTP version
 pub const HTTPVersion = struct {
@@ -9,15 +8,15 @@ pub const HTTPVersion = struct {
 
     /// Constructor function
     pub fn init(version: []const u8) ReadError!HTTPVersion {
-        if (std.mem.eql(u8, version, "0.9")) {
+        if (std.mem.eql(u8, version, "HTTP/0.9")) {
             return HTTPVersion{ .major = 0, .minor = 9 };
-        } else if (std.mem.eql(u8, version, "1.0")) {
+        } else if (std.mem.eql(u8, version, "HTTP/1.0")) {
             return HTTPVersion{ .major = 1, .minor = 0 };
-        } else if (std.mem.eql(u8, version, "1.1")) {
+        } else if (std.mem.eql(u8, version, "HTTP/1.1")) {
             return HTTPVersion{ .major = 1, .minor = 1 };
-        } else if (std.mem.eql(u8, version, "2.0")) {
+        } else if (std.mem.eql(u8, version, "HTTP/2.0")) {
             return HTTPVersion{ .major = 2, .minor = 0 };
-        } else if (std.mem.eql(u8, version, "3.0")) {
+        } else if (std.mem.eql(u8, version, "HTTP/3.0")) {
             return HTTPVersion{ .major = 3, .minor = 0 };
         } else {
             return ReadError.WrongRequestLine;
@@ -27,6 +26,13 @@ pub const HTTPVersion = struct {
     /// Function to print the HTTP version for debugging purposes
     pub fn debugPrint(self: HTTPVersion) void {
         std.debug.print("HTTPVersion({d}, {d})\n", .{ self.major, self.minor });
+    }
+
+    /// Function to format the HTTP version as a string
+    pub fn fmt(self: HTTPVersion) [13]u8 {
+        var buffer: [13]u8 = undefined;
+        _ = try std.fmt.bufPrint(&buffer, "HTTP/{d}.{d}", .{ self.major, self.minor }) catch unreachable;
+        return buffer;
     }
 
     /// check equality between two HTTPVersion instances
@@ -70,17 +76,17 @@ pub const HTTPMethod = enum {
     /// Request methods not standardized by the IETF
     NonStandard,
 
-    pub fn init(method: []const u8) Method {
-        if (std.mem.eql(u8, method, "GET")) return Method.Get;
-        if (std.mem.eql(u8, method, "HEAD")) return Method.Head;
-        if (std.mem.eql(u8, method, "POST")) return Method.Post;
-        if (std.mem.eql(u8, method, "PUT")) return Method.Put;
-        if (std.mem.eql(u8, method, "DELETE")) return Method.Delete;
-        if (std.mem.eql(u8, method, "CONNECT")) return Method.Connect;
-        if (std.mem.eql(u8, method, "OPTIONS")) return Method.Options;
-        if (std.mem.eql(u8, method, "TRACE")) return Method.Trace;
-        if (std.mem.eql(u8, method, "PATCH")) return Method.Patch;
-        return Method.NonStandard;
+    pub fn init(method: []const u8) HTTPMethod {
+        if (std.mem.eql(u8, method, "GET")) return HTTPMethod.Get;
+        if (std.mem.eql(u8, method, "HEAD")) return HTTPMethod.Head;
+        if (std.mem.eql(u8, method, "POST")) return HTTPMethod.Post;
+        if (std.mem.eql(u8, method, "PUT")) return HTTPMethod.Put;
+        if (std.mem.eql(u8, method, "DELETE")) return HTTPMethod.Delete;
+        if (std.mem.eql(u8, method, "CONNECT")) return HTTPMethod.Connect;
+        if (std.mem.eql(u8, method, "OPTIONS")) return HTTPMethod.Options;
+        if (std.mem.eql(u8, method, "TRACE")) return HTTPMethod.Trace;
+        if (std.mem.eql(u8, method, "PATCH")) return HTTPMethod.Patch;
+        return HTTPMethod.NonStandard;
     }
 };
 
@@ -182,26 +188,34 @@ pub const Header = struct {
     /// Parses a header string into a Header struct.
     ///
     /// - `InvalidHeader`: Returned if the header string is not in the correct format.s
-    pub fn parse(header_str: []const u8) !Header {
+    pub fn parse(header_str: []const u8) ReadError!Header {
+        var occurs = false;
+        var occurs_n: usize = 0;
+
+        for (0..header_str.len) |n| {
+            const c = header_str[n];
+            if (c == ':') {
+                occurs_n = n;
+                occurs = true;
+                break;
+            }
+        }
+        if (!occurs) {
+            return error.WrongHeader;
+        }
+
         var parts = std.mem.split(u8, header_str, ":");
-
-        const occurs = std.mem.count(u8, header_str, ":");
-
-        std.debug.print("{}\n", .{occurs});
-
-        if (occurs != 1) return error.InvalidHeader;
-
-        const field: []const u8 = parts.next() orelse return error.InvalidHeader;
-        const value: []const u8 = parts.next() orelse return error.InvalidHeader;
+        const field = parts.first();
+        const value = parts.next() orelse "";
 
         return Header{ .field = std.mem.trim(u8, field, " "), .value = std.mem.trim(u8, value, " ") };
     }
 };
 
 /// Error that can happen when reading a request.
-pub const ReadError = union(enum) {
+pub const ReadError = error{
     WrongRequestLine,
-    WrongHeader: HTTPVersion,
-    ExpectationFailed: HTTPVersion,
-    ReadIoError: net.Stream.ReadError,
+    WrongHeader,
+    ExpectationFailed,
+    ReadIoError,
 };
