@@ -1,35 +1,35 @@
 const std = @import("std");
-const common = @import("./common.zig");
-const Header = common.Header;
-const ReadError = common.ReadError;
-const HTTPMethod = common.HTTPMethod;
-const HTTPVersion = common.HTTPVersion;
 
+const Server = @import("./server.zig").Server;
 const Request = @import("./request.zig").Request;
+const Response = @import("./response.zig").Response;
+
+const common = @import("./common.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const fake_addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, 49505);
+    const server = try Server.init(allocator, "127.0.0.1", 4000);
 
-    const buffer =
-        "POST /submit HTTP/1.1\r\n" ++
-        "Host: 127.0.0.1:49505\r\n" ++
-        "User-Agent: zig-testing\r\n" ++
-        "Accept: */*\r\n" ++
-        "Content-Type: application/x-www-form-urlencoded\r\n" ++
-        "Content-Length: 13\r\n" ++
-        "Connection: close\r\n" ++
-        "\r\n" ++
-        "Body!";
-    // Test request buffer
-    const secure = false;
-    const must_send_continue = false;
-    const request = try Request.init(buffer, allocator, must_send_continue, fake_addr, secure);
-    defer _ = request.deinit();
+    _ = try server.listen_http(null);
+    while (true) {
+        const request = try server.accept();
+        defer _ = request.deinit();
 
-    // Print it
-    request.fmt();
+        std.debug.print("New request came up!\n", .{});
+        request.fmt();
+
+        const response = try Response.init(allocator);
+        defer _ = response.deinit();
+
+        response.body = "Kirwe";
+        response.status_code = common.StatusCode.init(200);
+        response.headers.append(common.Header.parse("Content-Type: text/plain"));
+
+        _ = try request.respond(response);
+
+        std.debug.print("Response Sent!\n", .{});
+    }
 }
