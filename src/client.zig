@@ -54,12 +54,13 @@ pub const Client = struct {
     pub fn next(self: *Client) !*Request {
         // the client sent a "connection: close" header in this previous request
         //  or is using HTTP 1.0, meaning that no new request will come
-        if (self.no_more_requests) {
-            return null;
-        }
+        // TODO
+        // if (self.no_more_requests) {
+        //     return null;
+        // }
 
         const buffer = try self.read_stream();
-        var request = try Request.init(buffer, self.allocator, false, self.remote_addr, self.safe);
+        var request = try Request.init(buffer, self.allocator, false, self.remote_addr, self.safe, self.stream);
 
         if (self.options.give_id_to_request) {
             request.ray_id = generate_uuid();
@@ -70,14 +71,14 @@ pub const Client = struct {
     /// Reading request buffer
     /// Returns a string
     ///
-    pub fn read_stream(self: *Client) ReadError![]u8 {
+    pub fn read_stream(self: *Client) ![]u8 {
         const chunk_size: usize = 256;
         var chunk_count: u16 = 1; // How many chunks are allocated
         var total_read: usize = 0;
         var bytes_read: usize = 0;
 
         // allocate buffer for read
-        var buffer = try self.allocator(u8, chunk_size);
+        var buffer = try self.allocator.alloc(u8, chunk_size);
 
         //Read with chunks
         while (true) {
@@ -88,8 +89,10 @@ pub const Client = struct {
 
             total_read += bytes_read;
 
-            std.debug.print("bytes read: {}\n", .{bytes_read});
-            std.debug.print("total len of buffer: {}\n", .{buffer.len});
+            // Debug
+
+            // std.debug.print("bytes read: {}\n", .{bytes_read});
+            // std.debug.print("total len of buffer: {}\n", .{buffer.len});
 
             // Check if we need more size
             if (total_read >= buffer.len) {
