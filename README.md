@@ -3,39 +3,42 @@
 
 ## Example:
 ```zig
-pub fn to_http_string(self: *Response, do_not_send_body: bool) ![]const u8 {
-    var buffer = std.ArrayList(u8).init(self.allocator);
-    defer buffer.deinit();
+const std = @import("std");
 
-    // Add status line
-    try buffer.appendSlice(std.fmt.allocPrint(self.allocator, "HTTP/{}.{} {} {}\r\n", .{
-        self.version.major,
-        self.version.minor,
-        self.status_code.code,
-        self.status_code.message(),
-    }));
+const Server = @import("./server.zig").Server;
+const Request = @import("./request.zig").Request;
+const Response = @import("./response.zig").Response;
 
-    // Add headers
-    for (self.headers.items) |header| {
-        try buffer.appendSlice(std.fmt.allocPrint(self.allocator, "{}: {}\r\n", .{
-            header.field,
-            header.value,
-        }));
+const common = @import("./common.zig");
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const server = try Server.init(allocator, "127.0.0.1", 4000, null);
+    defer _ = server.deinit();
+
+    _ = try server.listen_http(null);
+    while (true) {
+        const request = try server.accept();
+        defer _ = request.deinit();
+
+        std.debug.print("New request came up!\n", .{});
+
+        const response = try Response.init(allocator);
+        defer _ = response.deinit();
+
+        response.body = "Kirwe";
+        response.status_code = common.StatusCode.init(200);
+
+        _ = try response.headers.append(try common.Header.parse("Content-Type: text/plain"));
+        _ = try request.respond(response);
+
+        std.debug.print("Response Sent!\n", .{});
     }
-
-    // Add Content-Length header
-    try buffer.appendSlice(std.fmt.allocPrint(self.allocator, "Content-Length: {}\r\n", .{
-        if (do_not_send_body) 0 else self.body.len,
-    }));
-
-    // Add body
-    if (!do_not_send_body) {
-        try buffer.appendSlice("\r\n");
-        try buffer.appendSlice(self.body);
-    }
-
-    return buffer.toOwnedSlice();
 }
+
 ```
 
 ### Features
