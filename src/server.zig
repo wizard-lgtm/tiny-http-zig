@@ -29,10 +29,10 @@ pub const Server = struct {
     responder: net.Server,
     options: ServerOptions,
 
-    pub fn init(allocator: std.mem.allocator, addr: []const u8, port: u16, options: ?ServerOptions) !*Server {
+    pub fn init(allocator: std.mem.Allocator, addr: []const u8, port: u16, options: ?ServerOptions) !*Server {
         var self = try allocator.create(Server);
         self.allocator = allocator;
-        self.listener = Listener{ .addr = net.Address.parseIp4(addr, port) };
+        self.listener = Listener{ .addr = try net.Address.parseIp4(addr, port) };
         if (options) |value| {
             self.options = value;
         } else {
@@ -41,18 +41,23 @@ pub const Server = struct {
         }
         return self;
     }
+    pub fn deinit(self: *Server) void {
+        self.responder.deinit();
+        self.allocator.destroy(self);
+    }
     pub fn listen_http(self: *Server, options: ?Address.ListenOptions) Address.ListenError!void {
         if (options) |value| {
-            self.listener.addr.listen(value);
+            self.responder = try self.listener.addr.listen(value);
         } else {
             // Use default options
-            self.listener.addr.listen(default_listen_options);
+            self.responder = try self.listener.addr.listen(default_listen_options);
         }
     }
-    pub fn accept(self: *Server) !Request {
-        const connection = try self.responder.accept(self.responder);
-        const client = try Client.init(self.allocator, connection);
-        const request = try client.read();
+    pub fn accept(self: *Server) !*Request {
+        const connection = try self.responder.accept();
+        const client = try Client.init(self.allocator, connection, self.options);
+        defer client.deinit();
+        const request = try client.next();
         return request;
     }
 };
