@@ -28,7 +28,10 @@ pub const Request = struct {
     // data_reader: net.Stream.Reader,
 
     // if this writer is empty, then the request has been answered
-    response_writer: ?net.Stream.Writer,
+    // TODO
+    // response_writer: ?net.Stream.Writer,
+
+    stream: net.Stream,
 
     remote_addr: net.Ip4Address,
 
@@ -45,6 +48,8 @@ pub const Request = struct {
 
     body_length: ?usize,
 
+    sent: bool,
+
     // true if a `100 Continue` response must be sent when `as_reader()` is called
     must_send_continue: bool,
 
@@ -55,7 +60,7 @@ pub const Request = struct {
     /// Parses raw string request buffer
     /// Returns a HttpObject
     ///
-    pub fn init(buffer: []const u8, allocator: std.mem.Allocator, must_send_continue: bool, remote_addr: net.Address, secure: bool) !*Request {
+    pub fn init(buffer: []const u8, allocator: std.mem.Allocator, must_send_continue: bool, remote_addr: net.Ip4Address, secure: bool, stream: net.Stream) !*Request {
         var self = try allocator.create(Request);
 
         self.allocator = allocator;
@@ -66,8 +71,10 @@ pub const Request = struct {
         self.must_send_continue = must_send_continue;
         self.secure = secure;
         self.remote_addr = remote_addr;
-        self.response_writer = null;
+        self.sent = false;
+        self.stream = stream;
 
+        _ = allocator.free(buffer);
         return self;
     }
 
@@ -236,10 +243,17 @@ pub const Request = struct {
     pub fn respond(self: *Request, response: *Response) std.net.Stream.WriteError!void {
         const do_not_send_body = self.method == Method.Head;
 
-        const buffer = try response.to_http_string(do_not_send_body);
+        const buffer = response.to_http_string(do_not_send_body) catch |err| {
+            std.debug.print("TF! error happened while turning response to http string {any}\n", .{err});
+            return std.net.Stream.WriteError.NoSpaceLeft;
+        };
+
+        _ = try self.stream.writeAll(buffer);
+
         defer self.allocator.free(buffer);
 
-        _ = try self.response_writer.?.writeAll();
+        // Set sent to true
         self.sent = true;
+        _ = self.stream.close();
     }
 };
