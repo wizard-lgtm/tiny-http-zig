@@ -22,10 +22,10 @@ pub const Response = struct {
     data_length: usize,
     chunked_threshold: ?usize,
 
-    pub fn init(allocator: *Allocator) !Response {
+    pub fn init(allocator: Allocator) !*Response {
         var self = try allocator.create(Response);
         self.allocator = allocator;
-        self.headers = try std.ArrayList(Header).init(self.allocator);
+        self.headers = std.ArrayListAligned(Header, null).init(self.allocator);
         self.version = HTTPVersion{ .major = 1, .minor = 1 };
         return self;
     }
@@ -34,46 +34,37 @@ pub const Response = struct {
         self.headers.deinit();
         self.allocator.destroy(self);
     }
-
     pub fn to_http_string(self: *Response, do_not_send_body: bool) ![]const u8 {
-        const buffer = try self.allocator.alloc(u8, 0);
-        const status_str = try self.allocator.alloc(u8, 0);
-        const version_str = try self.allocator.alloc(u8, 0);
-        const length_str = try self.allocator.alloc(u8, 0);
-        defer self.allocator.free(status_str);
-        defer self.allocator.free(version_str);
-        defer self.allocator.free(length_str);
+        var buffer = std.ArrayList(u8).init(self.allocator);
+        defer buffer.deinit();
 
         // Add status line
-        _ = try std.fmt.bufPrint(version_str, "HTTP/{d}.{d}", .{ self.version.major, self.version.minor });
-        _ = try concat(self.allocator, &buffer, version_str);
-
-        _ = try std.fmt.bufPrint(status_str, "{d}", .{self.status_code.code});
-        _ = try concat(self.allocator, &buffer, status_str);
-
-        _ = try concat(self.allocator, &buffer, " ");
-
-        _ = try concat(self.allocator, &buffer, self.status_code.message());
-        _ = try concat(self.allocator, &buffer, "\r\n");
+        try buffer.appendSlice(try std.fmt.allocPrint(self.allocator, "HTTP/{d}.{d} {d} {s}\r\n", .{
+            self.version.major,
+            self.version.minor,
+            self.status_code.code,
+            self.status_code.message(),
+        }));
 
         // Add headers
         for (self.headers.items) |header| {
-            _ = try concat(self.allocator, &buffer, header.field);
-            _ = try concat(self.allocator, &buffer, ": ");
-            _ = try concat(self.allocator, &buffer, header.value);
-            _ = try concat(self.allocator, &buffer, "\r\n");
+            try buffer.appendSlice(try std.fmt.allocPrint(self.allocator, "{s}: {s}\r\n", .{
+                header.field,
+                header.value,
+            }));
         }
 
-        // Finally, Add size to header
-        _ = try std.fmt.bufPrint(version_str, "Content-Length: {d}", .{buffer.len});
-        _ = try concat(self.allocator, &buffer, length_str);
+        // Add Content-Length header
+        try buffer.appendSlice(try std.fmt.allocPrint(self.allocator, "Content-Length: {d}\r\n", .{
+            if (do_not_send_body) 0 else self.body.len,
+        }));
 
         // Add body
         if (!do_not_send_body) {
-            _ = try concat(self.allocator, &buffer, "\r\n");
-            _ = try concat(self.allocator, &buffer, self.body);
+            try buffer.appendSlice("\r\n");
+            try buffer.appendSlice(self.body);
         }
 
-        return buffer;
+        return try buffer.toOwnedSlice();
     }
 };
