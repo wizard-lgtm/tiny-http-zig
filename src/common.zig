@@ -1,4 +1,6 @@
 const std = @import("std");
+const Server = @import("./server.zig").Server;
+const Request = @import("./request.zig").Request;
 const net = std.net;
 
 /// Define a struct to represent the HTTP version
@@ -219,3 +221,9 @@ pub const ReadError = error{
     ExpectationFailed,
     ReadIoError,
 };
+
+///
+/// Handler type for declaring handler functions
+/// !TODO Future planned: implement ServerContext
+///
+pub const Handler: type = fn (*Server, *Request) anyerror!void;
