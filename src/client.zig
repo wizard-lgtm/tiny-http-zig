@@ -16,7 +16,6 @@ const Request = @import("./request.zig").Request;
 const Response = @import("./response.zig").Response;
 
 const ReadError = @import("./common.zig").ReadError;
-const generate_uuid = @import("./utils/uuid.zig").generate_uuid;
 const ServerOptions = @import("./server.zig").ServerOptions;
 
 /// A Client is an object that will store a stream to a client
@@ -63,7 +62,8 @@ pub const Client = struct {
         var request = try Request.init(buffer, self.allocator, false, self.remote_addr, self.safe, self.stream);
 
         if (self.options.give_id_to_request) {
-            request.ray_id = generate_uuid();
+            // !TODO, unimplemented
+            request.ray_id = "";
         }
         return request;
     }

@@ -44,6 +44,6 @@ pub fn main() !void {
         const request = try server.accept();
         defer _ = request.deinit();
 
-        on_request(server, request);
+        _ = try on_request(server, request);
     }
 }

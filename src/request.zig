@@ -153,7 +153,7 @@ pub const Request = struct {
         var headers_map = std.ArrayList(Header).init(allocator);
 
         // Split the headers string by lines
-        var headers_lines = std.mem.splitSequence(u8, headers_str, "\r\n");
+        var headers_lines = std.mem.splitScalar(u8, headers_str, "\r\n");
 
         while (true) {
             const line = headers_lines.next() orelse break;
@@ -200,12 +200,13 @@ pub const Request = struct {
         // Split request to two parts
         // Head and body
 
+        std.debug.print("Request buffer is: {s}\n", .{buffer});
         var parts = std.mem.splitSequence(u8, buffer, "\r\n\r\n");
         const head = parts.first();
         const body = parts.next() orelse "";
 
         // Split head into status line and headers
-        var head_parts = std.mem.split(u8, head, "\r\n");
+        var head_parts = std.mem.splitAny(u8, head, "\r\n");
 
         const status_line = head_parts.next() orelse return ReadError.WrongHeader;
 

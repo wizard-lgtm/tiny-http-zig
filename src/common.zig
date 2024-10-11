@@ -191,6 +191,7 @@ pub const Header = struct {
     ///
     /// - `InvalidHeader`: Returned if the header string is not in the correct format.s
     pub fn parse(header_str: []const u8) ReadError!Header {
+        std.debug.print("Header string: {s}\n", .{header_str});
         var occurs = false;
         var occurs_n: usize = 0;
 
@@ -206,7 +207,7 @@ pub const Header = struct {
             return error.WrongHeader;
         }
 
-        var parts = std.mem.split(u8, header_str, ":");
+        var parts = std.mem.splitAny(u8, header_str, ":");
         const field = parts.first();
         const value = parts.next() orelse "";
 
