@@ -8,6 +8,7 @@ const Response = @import("./response.zig").Response;
 const common = @import("./common.zig");
 
 fn on_request(server: *Server, request: *Request) !void {
+    std.debug.print("on request handler hit\n", .{});
     const allocator = server.allocator;
 
     std.debug.print("New request came up!\n", .{});
@@ -30,20 +31,16 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     const config = ServerConfig{
-        .port = 4000,
+        .port = 4002,
         .give_id_to_request = false,
         .logging = false, // Not implemented
         .addr = "127.0.0.1",
-        .on_request_handler = &on_request,
+        .on_request_handler = on_request,
+        .jobs_n = null,
     };
     const server = try Server.init(allocator, config);
     defer _ = server.deinit();
 
     _ = try server.listen_http(null);
-    while (true) {
-        const request = try server.accept();
-        defer _ = request.deinit();
-
-        _ = try on_request(server, request);
-    }
+    _ = try server.start();
 }
