@@ -20,9 +20,10 @@ pub const ServerOptions = struct {
     const DefaultServerOptions = ServerOptions{
         .give_id_to_request = true,
         .logging = false, // !TODO not implemented!
-        .on_request_handler = null,
+        .on_request_handler = common.default_on_request_handler,
         .addr = "127.0.0.1",
         .port = 4000,
+        .jobs_n = 32,
     };
     // gives random uuid to each request
     give_id_to_request: bool,
@@ -30,9 +31,10 @@ pub const ServerOptions = struct {
     // Future planned
     logging: bool,
 
-    on_request_handler: ?*const common.Handler,
+    on_request_handler: ?common.Handler,
     addr: []const u8,
     port: u16,
+    jobs_n: ?usize, // Job size for Thread Pool
     pub fn default() ServerOptions {
         return DefaultServerOptions;
     }
@@ -46,21 +48,22 @@ const default_listen_options = net.Address.ListenOptions{
     // Allow multiple sockets to listen on the same port
     .reuse_port = true,
 };
-
-/// just a basic handler wrapper for threading
-fn handler_wrapper(h: common.Handler) void() {
+pub fn thread_handler_wrapper(h: common.Handler, server: *Server, request: *Request) void {
     // Execute the handler and handle error with catch
-    h() catch |err| {
+    defer request.deinit();
+    h(server, request) catch |err| {
         std.debug.print("some error happened while executing handler! {any}\n", .{err});
     };
 }
-
 pub const Server = struct {
     allocator: std.mem.Allocator,
     listener: Listener,
     responder: net.Server,
     options: ServerOptions,
+    pool: std.Thread.Pool,
 
+    const Self = @This();
+    /// just a basic handler wrapper for threading
     pub fn init(allocator: std.mem.Allocator, options: ?ServerOptions) !*Server {
         var self = try allocator.create(Server);
         if (options) |value| {
@@ -71,9 +74,14 @@ pub const Server = struct {
         }
         self.allocator = allocator;
         self.listener = Listener{ .addr = try net.Address.parseIp4(self.options.addr, self.options.port) };
+        var pool: std.Thread.Pool = undefined;
+        const jobs_n: usize = self.options.jobs_n orelse 32;
+        try pool.init(std.Thread.Pool.Options{ .allocator = self.allocator, .n_jobs = jobs_n });
+        self.pool = pool;
         return self;
     }
     pub fn deinit(self: *Server) void {
+        self.pool.deinit();
         self.responder.deinit();
         self.allocator.destroy(self);
     }
@@ -83,6 +91,23 @@ pub const Server = struct {
         } else {
             // Use default options
             self.responder = try self.listener.addr.listen(default_listen_options);
+        }
+    }
+    fn mainloop_handler(self: *Server) void {
+        mainloop(self) catch |err| {
+            std.debug.print("Some error happened in mainloop! err: {any}\n", .{err});
+        };
+    }
+    pub fn start(self: *Server) !void {
+        try self.pool.spawn(mainloop_handler, .{self});
+    }
+    pub fn mainloop(self: *Server) !void {
+        while (true) {
+            std.debug.print("Mainloop works!\n", .{});
+            const request = try self.accept();
+            const h = thread_handler_wrapper;
+            const on_request = self.options.on_request_handler.?;
+            _ = try self.pool.spawn(h, .{ on_request, self, request });
         }
     }
     pub fn accept(self: *Server) !*Request {
