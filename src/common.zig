@@ -1,6 +1,7 @@
 const std = @import("std");
 const Server = @import("./server.zig").Server;
 const Request = @import("./request.zig").Request;
+const Response = @import("./response.zig").Response;
 const net = std.net;
 
 /// Define a struct to represent the HTTP version
@@ -219,4 +220,20 @@ pub const ReadError = error{
 /// Handler type for declaring handler functions
 /// !TODO Future planned: implement ServerContext
 ///
-pub const Handler: type = fn (*Server, *Request) anyerror!void;
+pub const Handler: type = *const fn (*Server, *Request) anyerror!void;
+
+pub fn default_on_request_handler(server: *Server, request: *Request) !void {
+    const allocator = server.allocator;
+    std.debug.print("New request came up!\n", .{});
+
+    const response = try Response.init(allocator);
+    defer _ = response.deinit();
+
+    response.body = "<h1>Thanks for using, tinyhttp<h1> <h3>This a default handler, to change; please set ServerOptions.on_request handler for handling.</h3>";
+    response.status_code = StatusCode.init(200);
+
+    _ = try response.headers.append(try Header.parse("Content-Type: text/html"));
+    _ = try request.respond(response);
+
+    std.debug.print("Response Sent!\n", .{});
+}
