@@ -206,7 +206,7 @@ pub const Request = struct {
         const body = parts.next() orelse "";
 
         // Split head into status line and headers
-        var head_parts = std.mem.splitAny(u8, head, "\r\n");
+        var head_parts = std.mem.splitSequence(u8, head, "\r\n");
 
         const status_line = head_parts.next() orelse return ReadError.WrongHeader;
 
