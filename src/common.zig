@@ -187,31 +187,23 @@ pub const Header = struct {
         return std.mem.eql(u8, self.field, other.field) and std.mem.eql(u8, self.value, other.value);
     }
 
-    /// Parses a header string into a Header struct.
+    /// Parses a single header string into a Header struct.
     ///
-    /// - `InvalidHeader`: Returned if the header string is not in the correct format.s
+    /// This function can handle headers that may have leading/trailing whitespace,
+    /// as well as headers that use \r\n line endings.
+    ///
     pub fn parse(header_str: []const u8) ReadError!Header {
-        std.debug.print("Header string: {s}\n", .{header_str});
-        var occurs = false;
-        var occurs_n: usize = 0;
+        // Trim leading and trailing whitespace, including newlines
+        const trimmed = std.mem.trim(u8, header_str, " \n\r");
 
-        for (0..header_str.len) |n| {
-            const c = header_str[n];
-            if (c == ':') {
-                occurs_n = n;
-                occurs = true;
-                break;
-            }
-        }
-        if (!occurs) {
-            return error.WrongHeader;
-        }
+        // Find the first colon
+        const colon_index = std.mem.indexOfScalar(u8, trimmed, ':') orelse return error.WrongHeader;
 
-        var parts = std.mem.splitAny(u8, header_str, ":");
-        const field = parts.first();
-        const value = parts.next() orelse "";
+        // Split the string at the colon
+        const field = std.mem.trim(u8, trimmed[0..colon_index], " ");
+        const value = std.mem.trim(u8, trimmed[colon_index + 1 ..], " \r\n");
 
-        return Header{ .field = std.mem.trim(u8, field, " "), .value = std.mem.trim(u8, value, " ") };
+        return Header{ .field = field, .value = value };
     }
 };
 
