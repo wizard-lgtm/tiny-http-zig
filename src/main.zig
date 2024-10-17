@@ -42,5 +42,5 @@ pub fn main() !void {
     defer _ = server.deinit();
 
     _ = try server.listen_http(null);
-    _ = try server.start();
+    _ = try server.mainloop();
 }

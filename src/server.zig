@@ -48,19 +48,12 @@ const default_listen_options = net.Address.ListenOptions{
     // Allow multiple sockets to listen on the same port
     .reuse_port = true,
 };
-pub fn thread_handler_wrapper(h: common.Handler, server: *Server, request: *Request) void {
-    // Execute the handler and handle error with catch
-    defer request.deinit();
-    h(server, request) catch |err| {
-        std.debug.print("some error happened while executing handler! {any}\n", .{err});
-    };
-}
+
 pub const Server = struct {
     allocator: std.mem.Allocator,
     listener: Listener,
     responder: net.Server,
     options: ServerOptions,
-    pool: std.Thread.Pool,
 
     const Self = @This();
     /// just a basic handler wrapper for threading
@@ -74,14 +67,9 @@ pub const Server = struct {
         }
         self.allocator = allocator;
         self.listener = Listener{ .addr = try net.Address.parseIp4(self.options.addr, self.options.port) };
-        var pool: std.Thread.Pool = undefined;
-        const jobs_n: usize = self.options.jobs_n orelse 32;
-        try pool.init(std.Thread.Pool.Options{ .allocator = self.allocator, .n_jobs = jobs_n });
-        self.pool = pool;
         return self;
     }
     pub fn deinit(self: *Server) void {
-        self.pool.deinit();
         self.responder.deinit();
         self.allocator.destroy(self);
     }
@@ -93,21 +81,13 @@ pub const Server = struct {
             self.responder = try self.listener.addr.listen(default_listen_options);
         }
     }
-    fn mainloop_handler(self: *Server) void {
-        mainloop(self) catch |err| {
-            std.debug.print("Some error happened in mainloop! err: {any}\n", .{err});
-        };
-    }
-    pub fn start(self: *Server) !void {
-        try self.pool.spawn(mainloop_handler, .{self});
-    }
+
     pub fn mainloop(self: *Server) !void {
         while (true) {
             std.debug.print("Mainloop works!\n", .{});
             const request = try self.accept();
-            const h = thread_handler_wrapper;
             const on_request = self.options.on_request_handler.?;
-            _ = try self.pool.spawn(h, .{ on_request, self, request });
+            _ = try on_request(self, request);
         }
     }
     pub fn accept(self: *Server) !*Request {
