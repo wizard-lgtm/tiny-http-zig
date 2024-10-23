@@ -81,10 +81,16 @@ pub const Server = struct {
             self.responder = try self.listener.addr.listen(default_listen_options);
         }
     }
-
+    ///
+    /// Just a wrapper function for server.listen and server.mainloop
+    ///
+    pub fn start(self: *Server) !void {
+        try self.listen_http(null);
+        try self.mainloop();
+    }
     pub fn mainloop(self: *Server) !void {
         while (true) {
-            std.debug.print("Mainloop works!\n", .{});
+            std.debug.print("Server started!\n", .{});
             const request = try self.accept();
             const on_request = self.options.on_request_handler.?;
             _ = try on_request(self, request);

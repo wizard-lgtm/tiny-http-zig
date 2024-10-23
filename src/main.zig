@@ -40,7 +40,5 @@ pub fn main() !void {
     };
     const server = try Server.init(allocator, config);
     defer _ = server.deinit();
-
-    _ = try server.listen_http(null);
-    _ = try server.mainloop();
+    try server.start();
 }
