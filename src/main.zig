@@ -7,7 +7,10 @@ const Response = @import("./response.zig").Response;
 
 const common = @import("./common.zig");
 
-fn on_request(server: *Server, request: *Request) !void {
+fn on_request1(server: *Server, request: *Request) !void {
+    // Delay 2 seconds for testing threading
+    std.time.sleep(std.time.ns_per_ms * 2000);
+
     std.debug.print("on request handler hit\n", .{});
     const allocator = server.allocator;
 
@@ -23,6 +26,11 @@ fn on_request(server: *Server, request: *Request) !void {
     _ = try request.respond(response);
 
     std.debug.print("Response Sent!\n", .{});
+}
+fn on_request(server: *Server, request: *Request) !void {
+    _ = server;
+    _ = request;
+    std.debug.print("on request handler worked!\n", .{});
 }
 
 pub fn main() !void {

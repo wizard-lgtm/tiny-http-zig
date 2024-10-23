@@ -9,6 +9,8 @@ const Client = @import("./client.zig").Client;
 
 const Listener = struct { addr: net.Address };
 
+const Pool = std.Thread.Pool;
+
 ///
 /// Server configs, you may configure the server before initializiton
 /// Functions:
@@ -54,6 +56,8 @@ pub const Server = struct {
     listener: Listener,
     responder: net.Server,
     options: ServerOptions,
+    // Pool
+    pool: *Pool,
 
     const Self = @This();
     /// just a basic handler wrapper for threading
@@ -67,9 +71,17 @@ pub const Server = struct {
         }
         self.allocator = allocator;
         self.listener = Listener{ .addr = try net.Address.parseIp4(self.options.addr, self.options.port) };
+
+        // Init pool
+        var pool: Pool = undefined;
+        const pool_options: Pool.Options = .{ .allocator = allocator, .n_jobs = null, .track_ids = false };
+        try pool.init(pool_options);
+        self.pool = &pool;
+
         return self;
     }
     pub fn deinit(self: *Server) void {
+        self.pool.deinit();
         self.responder.deinit();
         self.allocator.destroy(self);
     }
@@ -81,6 +93,20 @@ pub const Server = struct {
             self.responder = try self.listener.addr.listen(default_listen_options);
         }
     }
+
+    ///
+    /// Wrapper for handling functions in server.pool
+    /// Since pool does not allow anyerror functions we need to
+    /// Handle it by catch
+    ///
+    fn handler_wrapper(self: *Server, handler: common.Handler, request: *Request) void {
+        std.debug.print("Thread opened!\n", .{});
+        handler(self, request) catch |err| {
+            std.debug.print("Some error happened while executing the handler:\n{any}", .{err});
+        };
+        // TODO, on error handler
+    }
+
     ///
     /// Just a wrapper function for server.listen and server.mainloop
     ///
@@ -89,11 +115,15 @@ pub const Server = struct {
         try self.mainloop();
     }
     pub fn mainloop(self: *Server) !void {
+        std.debug.print("Server started!\n", .{});
         while (true) {
-            std.debug.print("Server started!\n", .{});
             const request = try self.accept();
+            defer request.deinit();
             const on_request = self.options.on_request_handler.?;
-            _ = try on_request(self, request);
+            // Spawn on request in server.pool
+            try self.pool.*.spawn(handler_wrapper, .{ self, on_request, request });
+
+            std.debug.print("Thread created!", .{});
         }
     }
     pub fn accept(self: *Server) !*Request {
